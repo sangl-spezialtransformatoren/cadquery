@@ -1,37 +1,37 @@
-from typing import (
-    List,
-    Tuple,
-    Union,
-    Any,
-    Callable,
-    Optional,
-    Dict,
-    Literal,
-    cast as tcast,
-    Type,
-)
-
-from math import radians, pi
-from typish import instance_of, get_type
+from math import pi
+from math import radians
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Literal
+from typing import Optional
+from typing import Tuple
+from typing import Type
+from typing import Union
+from typing import cast as tcast
 
 import casadi as ca
-
-from OCP.gp import (
-    gp_Vec,
-    gp_Pln,
-    gp_Dir,
-    gp_Pnt,
-    gp_Trsf,
-    gp_Quaternion,
-    gp_Lin,
-    gp_Extrinsic_XYZ,
-)
-
 from OCP.BRepTools import BRepTools
 from OCP.Precision import Precision
+from OCP.gp import gp_Dir
+from OCP.gp import gp_Extrinsic_XYZ
+from OCP.gp import gp_Lin
+from OCP.gp import gp_Pln
+from OCP.gp import gp_Pnt
+from OCP.gp import gp_Quaternion
+from OCP.gp import gp_Trsf
+from OCP.gp import gp_Vec
+from typish import get_type
+from typish import instance_of
 
-from .geom import Location, Vector, Plane
-from .shapes import Shape, Face, Edge, Wire
+from .geom import Location
+from .geom import Plane
+from .geom import Vector
+from .shapes import Edge
+from .shapes import Face
+from .shapes import Shape
+from .shapes import Wire
 from ..types import Real
 
 # type definitions
@@ -42,11 +42,20 @@ DOF6 = Tuple[Tuple[float, float, float], Tuple[float, float, float]]
 ConstraintMarker = Union[gp_Pln, gp_Dir, gp_Pnt, gp_Lin, None]
 
 UnaryConstraintKind = Literal["Fixed", "FixedPoint", "FixedAxis", "FixedRotation"]
-BinaryConstraintKind = Literal["Plane", "Point", "Axis", "PointInPlane", "PointOnLine"]
+
+BinaryConstraintKind = Literal[
+    "Plane",
+    "Point",
+    "Axis",
+    "UndirectedAxis",
+    "PointInPlane",
+    "PointOnLine"
+]
 ConstraintKind = Literal[
     "Plane",
     "Point",
     "Axis",
+    "UndirectedAxis",
     "PointInPlane",
     "Fixed",
     "FixedPoint",
@@ -59,6 +68,12 @@ ConstraintKind = Literal[
 ConstraintInvariants = {
     "Point": (2, (gp_Pnt, gp_Pnt), Real, None),
     "Axis": (
+        2,
+        (gp_Dir, gp_Dir),
+        Real,
+        lambda x: radians(x) if x is not None else None,
+    ),
+    "UndirectedAxis": (
         2,
         (gp_Dir, gp_Dir),
         Real,
@@ -96,6 +111,7 @@ DIR_SCALING = 1e2
 DIFF_EPS = 1e-10
 TOL = 1e-12
 MAXITER = 2000
+
 
 # high-level constraint class - to be used by clients
 
@@ -256,7 +272,7 @@ class ConstraintSpec(object):
         markers: List[Tuple[ConstraintMarker, ...]]
 
         # convert to marker objects
-        if self.kind == "Axis":
+        if self.kind in ["Axis", 'UndirectedAxis']:
             markers = [(self._getAxis(args[0]), self._getAxis(args[1]),)]
 
         elif self.kind == "Point":
@@ -295,7 +311,7 @@ class ConstraintSpec(object):
         # specify kinds of the simple constraint
         if self.kind in CompoundConstraints:
             kinds, converter = CompoundConstraints[self.kind]
-            params = converter(self.param,)
+            params = converter(self.param, )
         else:
             kinds = (self.kind,)
             params = (self.param,)
@@ -306,7 +322,6 @@ class ConstraintSpec(object):
 
 # Cost functions of simple constraints
 def Quaternion(R):
-
     m = ca.sumsqr(R)
 
     u = 2 * R / (1 + m)
@@ -316,14 +331,12 @@ def Quaternion(R):
 
 
 def Rotate(v, R):
-
     s, u = Quaternion(R)
 
     return 2 * ca.dot(u, v) * u + (s ** 2 - ca.dot(u, u)) * v + 2 * s * ca.cross(u, v)
 
 
 def Transform(v, T, R):
-
     return Rotate(v, R) + T
 
 
@@ -342,15 +355,14 @@ def point_cost(
     val: Optional[float] = None,
     scale: float = 1,
 ) -> float:
-
     val = 0 if val is None else val
 
     m1_dm = ca.DM((m1.X(), m1.Y(), m1.Z()))
     m2_dm = ca.DM((m2.X(), m2.Y(), m2.Z()))
 
     dummy = (
-        Transform(m1_dm, T1_0 + T1, R1_0 + R1) - Transform(m2_dm, T2_0 + T2, R2_0 + R2)
-    ) / scale
+                Transform(m1_dm, T1_0 + T1, R1_0 + R1) - Transform(m2_dm, T2_0 + T2, R2_0 + R2)
+            ) / scale
 
     if val == 0:
         return ca.sumsqr(dummy)
@@ -373,7 +385,6 @@ def axis_cost(
     val: Optional[float] = None,
     scale: float = 1,
 ) -> float:
-
     val = pi if val is None else val
 
     m1_dm = ca.DM((m1.X(), m1.Y(), m1.Z()))
@@ -396,6 +407,29 @@ def axis_cost(
     return dummy ** 2
 
 
+def undirected_axis_cost(
+    problem,
+    m1: gp_Dir,
+    m2: gp_Dir,
+    T1_0,
+    R1_0,
+    T2_0,
+    R2_0,
+    T1,
+    R1,
+    T2,
+    R2,
+    val: Optional[float] = None,
+    scale: float = 1,
+) -> float:
+    m1_dm = ca.DM((m1.X(), m1.Y(), m1.Z()))
+    m2_dm = ca.DM((m2.X(), m2.Y(), m2.Z()))
+
+    d1, d2 = (Rotate(m1_dm, R1_0 + R1), Rotate(m2_dm, R2_0 + R2))
+
+    return ca.sumsqr(ca.cross(d1, d2))
+
+
 def point_in_plane_cost(
     problem,
     m1: gp_Pnt,
@@ -411,7 +445,6 @@ def point_in_plane_cost(
     val: Optional[float] = None,
     scale: float = 1,
 ) -> float:
-
     val = 0 if val is None else val
 
     m1_dm = ca.DM((m1.X(), m1.Y(), m1.Z()))
@@ -449,7 +482,6 @@ def point_on_line_cost(
     val: Optional[float] = None,
     scale: float = 1,
 ) -> float:
-
     val = 0 if val is None else val
 
     m1_dm = ca.DM((m1.X(), m1.Y(), m1.Z()))
@@ -484,7 +516,6 @@ def fixed_cost(
     val: Optional[Type[None]] = None,
     scale: float = 1,
 ):
-
     return None
 
 
@@ -498,7 +529,6 @@ def fixed_point_cost(
     val: Tuple[float, float, float],
     scale: float = 1,
 ):
-
     m1_dm = ca.DM((m1.X(), m1.Y(), m1.Z()))
 
     dummy = (Transform(m1_dm, T1_0 + T1, R1_0 + R1) - ca.DM(val)) / scale
@@ -516,7 +546,6 @@ def fixed_axis_cost(
     val: Tuple[float, float, float],
     scale: float = 1,
 ):
-
     m1_dm = ca.DM((m1.X(), m1.Y(), m1.Z()))
     m_val = ca.DM(val) / ca.norm_2(ca.DM(val))
 
@@ -535,7 +564,6 @@ def fixed_rotation_cost(
     val: Tuple[float, float, float],
     scale: float = 1,
 ):
-
     q = gp_Quaternion()
     q.SetEulerAngles(gp_Extrinsic_XYZ, *val)
     q_dm = ca.DM((q.W(), q.X(), q.Y(), q.Z()))
@@ -549,6 +577,7 @@ def fixed_rotation_cost(
 costs: Dict[str, Callable[..., float]] = dict(
     Point=point_cost,
     Axis=axis_cost,
+    UndirectedAxis=undirected_axis_cost,
     PointInPlane=point_in_plane_cost,
     PointOnLine=point_on_line_cost,
     Fixed=fixed_cost,
@@ -560,6 +589,7 @@ costs: Dict[str, Callable[..., float]] = dict(
 scaling: Dict[str, bool] = dict(
     Point=True,
     Axis=False,
+    UndirectedAxis=False,
     PointInPlane=True,
     PointOnLine=True,
     Fixed=False,
@@ -568,11 +598,11 @@ scaling: Dict[str, bool] = dict(
     FixedRotation=False,
 )
 
+
 # Actual solver class
 
 
 class ConstraintSolver(object):
-
     opti: ca.Opti
     variables: List[Tuple[ca.MX, ca.MX]]
     starting_points: List[Tuple[ca.MX, ca.MX]]
