@@ -96,6 +96,48 @@ files = [
 ]
 
 [[package]]
+name = "cadquery-ocp"
+version = "7.7.2"
+description = "OCP+VTK wheel with shared library dependencies bundled."
+optional = false
+python-versions = "*"
+files = [
+    {file = "cadquery_ocp-7.7.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:33780b1071c9520467bdd2da501f0839a7b438e966c5768a67abb62a5c49a79e"},
+]
+
+[package.source]
+type = "url"
+url = "https://github.com/jdegenstein/ocp-build-system/releases/download/7.7.2_macos_arm64/cadquery_ocp-7.7.2-cp310-cp310-macosx_11_0_arm64.whl"
+
+[[package]]
+name = "cadquery-ocp"
+version = "7.7.2"
+description = "OCP+VTK wheel with shared library dependencies bundled."
+optional = false
+python-versions = "*"
+files = [
+    {file = "cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:0a459103ede0efb5551f449cef92a65c76f51c4754565f353af58c650747a32b"},
+]
+
+[package.source]
+type = "url"
+url = "https://github.com/jdegenstein/ocp-build-system/releases/download/7.7.2_macos_arm64/cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl"
+
+[[package]]
+name = "cadquery-ocp"
+version = "7.7.2"
+description = "OCP+VTK wheel with shared library dependencies bundled."
+optional = false
+python-versions = "*"
+files = [
+    {file = "cadquery_ocp-7.7.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:ac8285d5b83e92199fc4bb22d4de03d8a064b07dc53a3a880e981e1dc3ec62e8"},
+]
+
+[package.source]
+type = "url"
+url = "https://github.com/jdegenstein/ocp-build-system/releases/download/7.7.2_macos_arm64/cadquery_ocp-7.7.2-cp312-cp312-macosx_11_0_arm64.whl"
+
+[[package]]
 name = "casadi"
 version = "3.6.5"
 description = "CasADi -- framework for algorithmic differentiation and numeric optimization"
@@ -1136,4 +1178,4 @@ ipython = ["ipython"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10, <4"
-content-hash = "e97718fa4513cae1c1e24b364917e43a6fcbe426ff784d19928ca1b512b108d6"
+content-hash = "b6a64ee89cf5d26b2da8d0a36bd679e7642b0a5a1f666036343ab9342cc2d596"
