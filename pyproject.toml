@@ -32,7 +32,14 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.10, <4"
-cadquery-ocp = ">=7.7.0a0,<7.8"
+cadquery-ocp = [
+    # Provide wheels for Apple Silicon
+    # https://github.com/jdegenstein/ocp-build-system
+    { markers = 'platform_system != "Darwin" or platform_machine != "arm64"', version = ">=7.7.0a0,<7.8" },
+    { markers = 'python_version == "3.12" and platform_system == "Darwin" and platform_machine == "arm64"', url = "https://github.com/jdegenstein/ocp-build-system/releases/download/7.7.2_macos_arm64/cadquery_ocp-7.7.2-cp312-cp312-macosx_11_0_arm64.whl" },
+    { markers = 'python_version == "3.11" and platform_system == "Darwin" and platform_machine == "arm64"', url = "https://github.com/jdegenstein/ocp-build-system/releases/download/7.7.2_macos_arm64/cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl" },
+    { markers = 'python_version == "3.10" and platform_system == "Darwin" and platform_machine == "arm64"', url = "https://github.com/jdegenstein/ocp-build-system/releases/download/7.7.2_macos_arm64/cadquery_ocp-7.7.2-cp310-cp310-macosx_11_0_arm64.whl" },
+]
 ezdxf = "*"
 multimethod = "==1.9.1"
 nptyping = "==2.0.1"
