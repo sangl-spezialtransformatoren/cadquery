@@ -1,43 +1,50 @@
-from typing import (
-    Union,
-    Iterable,
-    Iterator,
-    Tuple,
-    Dict,
-    overload,
-    Optional,
-    Any,
-    List,
-    cast,
-)
-from typing_extensions import Protocol
 from math import degrees
+from typing import Any
+from typing import Dict
+from typing import Iterable
+from typing import Iterator
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
+from typing import cast
+from typing import overload
 
-from OCP.TDocStd import TDocStd_Document
-from OCP.TCollection import TCollection_ExtendedString
-from OCP.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorType, XCAFDoc_ColorGen
-from OCP.XCAFApp import XCAFApp_Application
-from OCP.TDataStd import TDataStd_Name
-from OCP.TDF import TDF_Label
-from OCP.TopLoc import TopLoc_Location
-from OCP.Quantity import Quantity_ColorRGBA
+from OCP.BOPAlgo import BOPAlgo_GlueEnum
+from OCP.BOPAlgo import BOPAlgo_MakeConnected
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
+from OCP.Quantity import Quantity_ColorRGBA
+from OCP.TCollection import TCollection_AsciiString
+from OCP.TCollection import TCollection_ExtendedString
+from OCP.TCollection import TCollection_HAsciiString
+from OCP.TDF import TDF_Label
+from OCP.TDataStd import TDataStd_Name
+from OCP.TDocStd import TDocStd_Document
+from OCP.TopLoc import TopLoc_Location
 from OCP.TopTools import TopTools_ListOfShape
-from OCP.BOPAlgo import BOPAlgo_GlueEnum, BOPAlgo_MakeConnected
 from OCP.TopoDS import TopoDS_Shape
-
-from vtkmodules.vtkRenderingCore import (
-    vtkActor,
-    vtkPolyDataMapper as vtkMapper,
-    vtkRenderer,
-)
-
+from OCP.XCAFApp import XCAFApp_Application
+from OCP.XCAFDoc import XCAFDoc_ColorGen
+from OCP.XCAFDoc import XCAFDoc_ColorType
+from OCP.XCAFDoc import XCAFDoc_DocumentTool
+from OCP.XCAFDoc import XCAFDoc_Material
+from OCP.XCAFDoc import XCAFDoc_MaterialTool
+from OCP.XCAFDoc import XCAFDoc_VisMaterial
+from OCP.XCAFDoc import XCAFDoc_VisMaterialPBR
+from typing_extensions import Protocol
+from vtkmodules.vtkCommonDataModel import VTK_LINE
+from vtkmodules.vtkCommonDataModel import VTK_TRIANGLE
+from vtkmodules.vtkCommonDataModel import VTK_VERTEX
 from vtkmodules.vtkFiltersExtraction import vtkExtractCellsByType
-from vtkmodules.vtkCommonDataModel import VTK_TRIANGLE, VTK_LINE, VTK_VERTEX
+from vtkmodules.vtkRenderingCore import vtkActor
+from vtkmodules.vtkRenderingCore import vtkPolyDataMapper as vtkMapper
+from vtkmodules.vtkRenderingCore import vtkRenderer
 
-from .geom import Location
-from .shapes import Shape, Solid, Compound
 from .exporters.vtk import toString
+from .geom import Location
+from .shapes import Compound
+from .shapes import Shape
+from .shapes import Solid
 from ..cq import Workplane
 
 # type definitions
@@ -109,6 +116,135 @@ class Color(object):
         return (rgb.Red(), rgb.Green(), rgb.Blue(), a)
 
 
+class Material:
+    wrapped: XCAFDoc_Material
+    wrapped_vis: XCAFDoc_VisMaterial
+
+    @classmethod
+    def from_ocp(cls, material: XCAFDoc_Material, vis_material: XCAFDoc_VisMaterial):
+        self = cls.__new__(cls)
+        self.wrapped = material
+        self.wrapped_vis = vis_material
+        return self
+
+    def __init__(
+            self,
+            name: str,
+            description: str = "",
+            density: float = 0.0,
+            base_color: "Color" = None,
+            metalness: float = 0.0,
+            roughness: float = 0.0,
+            refraction_index: float = 0.0
+    ):
+        self.wrapped = XCAFDoc_Material()
+        self.wrapped_vis = XCAFDoc_VisMaterial()
+        self.wrapped_vis.SetPbrMaterial(XCAFDoc_VisMaterialPBR())
+
+        self.name = name
+        self.description = description
+        self.density = density
+        self.base_color = base_color or Color(0.8, 0.8, 0.8, 1.0)
+        self.metalness = metalness
+        self.roughness = roughness
+        self.refraction_index = refraction_index
+
+    def get_label(self, material_tool: XCAFDoc_MaterialTool):
+        params = (
+            self.wrapped.GetName() or TCollection_HAsciiString(""),
+            self.wrapped.GetDescription() or TCollection_HAsciiString(""),
+            self.wrapped.GetDensity() or 0.0,
+            self.wrapped.GetDensName() or TCollection_HAsciiString(""),
+            self.wrapped.GetDensValType() or TCollection_HAsciiString("")
+        )
+        return material_tool.AddMaterial(*params)
+
+    @property
+    def name(self) -> str:
+        return self.wrapped.GetName().ToCString()
+
+    @name.setter
+    def name(self, value: str):
+        self.wrapped.Set(
+            TCollection_HAsciiString(value),
+            self.wrapped.GetDescription(),
+            self.wrapped.GetDensity(),
+            self.wrapped.GetDensName(),
+            self.wrapped.GetDensValType()
+        )
+
+    @property
+    def description(self) -> str:
+        return self.wrapped.GetDescription().ToCString()
+
+    @description.setter
+    def description(self, value: str):
+        self.wrapped.Set(
+            self.wrapped.GetName(),
+            TCollection_HAsciiString(value),
+            self.wrapped.GetDensity(),
+            self.wrapped.GetDensName(),
+            self.wrapped.GetDensValType()
+        )
+
+    @property
+    def density(self) -> float:
+        return self.wrapped.GetDensity()
+
+    @density.setter
+    def density(self, value: float):
+        self.wrapped.Set(
+            self.wrapped.GetName(),
+            self.wrapped.GetDescription(),
+            value,
+            self.wrapped.GetDensName(),
+            self.wrapped.GetDensValType()
+        )
+
+    @property
+    def base_color(self) -> Color:
+        pbr = self.wrapped_vis.PbrMaterial()
+        color = Color()
+        color.wrapped = pbr.BaseColor
+        return color
+
+    @base_color.setter
+    def base_color(self, color: Color):
+        pbr = self.wrapped_vis.PbrMaterial()
+        pbr.BaseColor = color.wrapped
+        self.wrapped_vis.SetPbrMaterial(pbr)
+
+    @property
+    def metalness(self) -> float:
+        return self.wrapped_vis.PbrMaterial().Metallic
+
+    @metalness.setter
+    def metalness(self, value: float):
+        pbr = self.wrapped_vis.PbrMaterial()
+        pbr.Metallic = value
+        self.wrapped_vis.SetPbrMaterial(pbr)
+
+    @property
+    def roughness(self) -> float:
+        return self.wrapped_vis.PbrMaterial().Roughness
+
+    @roughness.setter
+    def roughness(self, value: float):
+        pbr = self.wrapped_vis.PbrMaterial()
+        pbr.Roughness = value
+        self.wrapped_vis.SetPbrMaterial(pbr)
+
+    @property
+    def refraction_index(self) -> float:
+        return self.wrapped_vis.PbrMaterial().RefractionIndex
+
+    @refraction_index.setter
+    def refraction_index(self, value: float):
+        pbr = self.wrapped_vis.PbrMaterial()
+        pbr.RefractionIndex = value
+        self.wrapped_vis.SetPbrMaterial(pbr)
+
+
 class AssemblyProtocol(Protocol):
     @property
     def loc(self) -> Location:
@@ -131,6 +267,10 @@ class AssemblyProtocol(Protocol):
         ...
 
     @property
+    def material(self) -> Optional[Material]:
+        ...
+
+    @property
     def obj(self) -> AssemblyObjects:
         ...
 
@@ -146,32 +286,29 @@ class AssemblyProtocol(Protocol):
         ...
 
     def __iter__(
-        self,
-        loc: Optional[Location] = None,
-        name: Optional[str] = None,
-        color: Optional[Color] = None,
+            self,
+            loc: Optional[Location] = None,
+            name: Optional[str] = None,
+            color: Optional[Color] = None,
     ) -> Iterator[Tuple[Shape, str, Location, Optional[Color]]]:
         ...
 
 
 def setName(l: TDF_Label, name: str, tool):
-
     TDataStd_Name.Set_s(l, TCollection_ExtendedString(name))
 
 
 def setColor(l: TDF_Label, color: Color, tool):
-
     tool.SetColor(l, color.wrapped, XCAFDoc_ColorType.XCAFDoc_ColorSurf)
 
 
 def toCAF(
-    assy: AssemblyProtocol,
-    coloredSTEP: bool = False,
-    mesh: bool = False,
-    tolerance: float = 1e-3,
-    angularTolerance: float = 0.1,
+        assy: AssemblyProtocol,
+        coloredSTEP: bool = False,
+        mesh: bool = False,
+        tolerance: float = 1e-3,
+        angularTolerance: float = 0.1,
 ) -> Tuple[TDF_Label, TDocStd_Document]:
-
     # prepare a doc
     app = XCAFApp_Application.GetApplication_s()
 
@@ -181,13 +318,18 @@ def toCAF(
     tool = XCAFDoc_DocumentTool.ShapeTool_s(doc.Main())
     tool.SetAutoNaming_s(False)
     ctool = XCAFDoc_DocumentTool.ColorTool_s(doc.Main())
+    material_tool = XCAFDoc_DocumentTool.MaterialTool_s(doc.Main())
+    vis_material_tool = XCAFDoc_DocumentTool.VisMaterialTool_s(doc.Main())
 
     # used to store labels with unique part-color combinations
     unique_objs: Dict[Tuple[Color, AssemblyObjects], TDF_Label] = {}
     # used to cache unique, possibly meshed, compounds; allows to avoid redundant meshing operations if same object is referenced multiple times in an assy
     compounds: Dict[AssemblyObjects, Compound] = {}
+    materials: Dict[Material, TDF_Label] = {}
+    visualization_materials: Dict[Material, TDF_Label] = {}
 
     def _toCAF(el, ancestor, color) -> TDF_Label:
+        nonlocal ctool, material_tool, unique_objs, compounds, materials, visualization_materials
 
         # create a subassy
         subassy = tool.NewShape()
@@ -223,6 +365,26 @@ def toCAF(
                 if coloredSTEP and current_color:
                     setColor(lab, current_color, ctool)
 
+                # Handle materials
+                if el.material:
+                    material = el.material
+                    if material in materials:
+                        material_label = materials[material]
+                    else:
+                        material_label = material.get_label(material_tool)
+                        materials[material] = material_label
+
+                    if material in visualization_materials:
+                        visualization_material_label = visualization_materials[material]
+                    else:
+                        visualization_material_label = vis_material_tool.AddMaterial(
+                            material.wrapped_vis.BackupCopy(),
+                            TCollection_AsciiString(material.name)
+                        )
+
+                    material_tool.SetMaterial(lab, material_label)
+                    vis_material_tool.SetShapeMaterial(lab, visualization_material_label)
+
             tool.AddComponent(subassy, lab, TopLoc_Location())
 
         # handle colors when *not* exporting to STEP
@@ -253,11 +415,9 @@ def toVTK(
     tolerance: float = 1e-3,
     angularTolerance: float = 0.1,
 ) -> vtkRenderer:
-
     renderer = vtkRenderer()
 
     for shape, _, loc, col_ in assy:
-
         col = col_.toTuple() if col_ else color
         trans, rot = loc.toTuple()
 
@@ -312,9 +472,9 @@ def toVTK(
 
 
 def toJSON(
-    assy: AssemblyProtocol,
-    color: Tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0),
-    tolerance: float = 1e-3,
+        assy: AssemblyProtocol,
+        color: Tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0),
+        tolerance: float = 1e-3,
 ) -> List[Dict[str, Any]]:
     """
     Export an object to a structure suitable for converting to VTK.js JSON.
@@ -323,7 +483,6 @@ def toJSON(
     rv = []
 
     for shape, _, loc, col_ in assy:
-
         val: Any = {}
 
         data = toString(shape, tolerance)
@@ -340,7 +499,7 @@ def toJSON(
 
 
 def toFusedCAF(
-    assy: AssemblyProtocol, glue: bool = False, tol: Optional[float] = None,
+        assy: AssemblyProtocol, glue: bool = False, tol: Optional[float] = None,
 ) -> Tuple[TDF_Label, TDocStd_Document]:
     """
     Converts the assembly to a fused compound and saves that within the document
