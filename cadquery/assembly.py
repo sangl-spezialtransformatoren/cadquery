@@ -1,40 +1,36 @@
 from functools import reduce
-from typing import (
-    Union,
-    Optional,
-    List,
-    Dict,
-    Any,
-    overload,
-    Tuple,
-    Iterator,
-    cast,
-    get_args,
-)
-from typing_extensions import Literal
-from typish import instance_of
+from typing import Any
+from typing import Dict
+from typing import Iterator
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
+from typing import cast
+from typing import get_args
+from typing import overload
 from uuid import uuid1 as uuid
 
-from .cq import Workplane
-from .occ_impl.shapes import Shape, Compound
-from .occ_impl.geom import Location
-from .occ_impl.assembly import Color
-from .occ_impl.solver import (
-    ConstraintKind,
-    ConstraintSolver,
-    ConstraintSpec as Constraint,
-    UnaryConstraintKind,
-    BinaryConstraintKind,
-)
-from .occ_impl.exporters.assembly import (
-    exportAssembly,
-    exportCAF,
-    exportVTKJS,
-    exportVRML,
-    exportGLTF,
-    STEPExportModeLiterals,
-)
+from typing_extensions import Literal
+from typish import instance_of
 
+from .cq import Workplane
+from .occ_impl.assembly import Color
+from .occ_impl.assembly import Material
+from .occ_impl.exporters.assembly import STEPExportModeLiterals
+from .occ_impl.exporters.assembly import exportAssembly
+from .occ_impl.exporters.assembly import exportCAF
+from .occ_impl.exporters.assembly import exportGLTF
+from .occ_impl.exporters.assembly import exportVRML
+from .occ_impl.exporters.assembly import exportVTKJS
+from .occ_impl.geom import Location
+from .occ_impl.shapes import Compound
+from .occ_impl.shapes import Shape
+from .occ_impl.solver import BinaryConstraintKind
+from .occ_impl.solver import ConstraintKind
+from .occ_impl.solver import ConstraintSolver
+from .occ_impl.solver import ConstraintSpec as Constraint
+from .occ_impl.solver import UnaryConstraintKind
 from .selectors import _expression_grammar as _selector_grammar
 from .utils import deprecate
 
@@ -44,9 +40,9 @@ ExportLiterals = Literal["STEP", "XML", "GLTF", "VTKJS", "VRML", "STL"]
 
 PATH_DELIM = "/"
 
+
 # entity selector grammar definition
 def _define_grammar():
-
     from pyparsing import (
         Literal as Literal,
         Word,
@@ -66,13 +62,13 @@ def _define_grammar():
     Selector = _selector_grammar.setResultsName("selector")
 
     SelectorType = (
-        Literal("solids") | Literal("faces") | Literal("edges") | Literal("vertices")
+            Literal("solids") | Literal("faces") | Literal("edges") | Literal("vertices")
     ).setResultsName("selector_kind")
 
     return (
-        Name
-        + Optional(TagSeparator + Tag)
-        + Optional(Separator + SelectorType + Separator + Selector)
+            Name
+            + Optional(TagSeparator + Tag)
+            + Optional(Separator + SelectorType + Separator + Selector)
     )
 
 
@@ -85,6 +81,7 @@ class Assembly(object):
     loc: Location
     name: str
     color: Optional[Color]
+    material: Optional[Material]
     metadata: Dict[str, Any]
 
     obj: AssemblyObjects
@@ -97,12 +94,13 @@ class Assembly(object):
     _solve_result: Optional[Dict[str, Any]]
 
     def __init__(
-        self,
-        obj: AssemblyObjects = None,
-        loc: Optional[Location] = None,
-        name: Optional[str] = None,
-        color: Optional[Color] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+            self,
+            obj: AssemblyObjects = None,
+            loc: Optional[Location] = None,
+            name: Optional[str] = None,
+            color: Optional[Color] = None,
+            material: Optional[Material] = None,
+            metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         construct an assembly
@@ -130,6 +128,7 @@ class Assembly(object):
         self.loc = loc if loc else Location()
         self.name = name if name else str(uuid())
         self.color = color if color else None
+        self.material = material if material else None
         self.metadata = metadata if metadata else {}
         self.parent = None
 
@@ -144,7 +143,7 @@ class Assembly(object):
         Make a deep copy of an assembly
         """
 
-        rv = self.__class__(self.obj, self.loc, self.name, self.color, self.metadata)
+        rv = self.__class__(self.obj, self.loc, self.name, self.color, self.material, self.metadata)
 
         for ch in self.children:
             ch_copy = ch._copy()
@@ -158,11 +157,12 @@ class Assembly(object):
 
     @overload
     def add(
-        self,
-        obj: "Assembly",
-        loc: Optional[Location] = None,
-        name: Optional[str] = None,
-        color: Optional[Color] = None,
+            self,
+            obj: "Assembly",
+            loc: Optional[Location] = None,
+            name: Optional[str] = None,
+            color: Optional[Color] = None,
+            material: Optional[Material] = None,
     ) -> "Assembly":
         """
         Add a subassembly to the current assembly.
@@ -174,17 +174,19 @@ class Assembly(object):
           the subassembly being used)
         :param color: color of the added object (default: None, resulting in the color stored in the
           subassembly being used)
+        :param material: material of the added object (default: None, resulting in the material
         """
         ...
 
     @overload
     def add(
-        self,
-        obj: AssemblyObjects,
-        loc: Optional[Location] = None,
-        name: Optional[str] = None,
-        color: Optional[Color] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+            self,
+            obj: AssemblyObjects,
+            loc: Optional[Location] = None,
+            name: Optional[str] = None,
+            color: Optional[Color] = None,
+            material: Optional[Material] = None,
+            metadata: Optional[Dict[str, Any]] = None,
     ) -> "Assembly":
         """
         Add a subassembly to the current assembly with explicit location and name.
@@ -195,6 +197,7 @@ class Assembly(object):
         :param name: unique name of the root object (default: None, resulting in an UUID being
           generated)
         :param color: color of the added object (default: None)
+        :param material: material of the added object (default: None)
         :param metadata: a store for user-defined metadata (default: None)
         """
         ...
@@ -216,6 +219,7 @@ class Assembly(object):
             subassy.loc = kwargs["loc"] if kwargs.get("loc") else arg.loc
             subassy.name = kwargs["name"] if kwargs.get("name") else arg.name
             subassy.color = kwargs["color"] if kwargs.get("color") else arg.color
+            subassy.material = kwargs["material"] if kwargs.get("material") else arg.material
             subassy.metadata = (
                 kwargs["metadata"] if kwargs.get("metadata") else arg.metadata
             )
@@ -297,7 +301,7 @@ class Assembly(object):
 
     @overload
     def constrain(
-        self, q1: str, q2: str, kind: ConstraintKind, param: Any = None
+            self, q1: str, q2: str, kind: ConstraintKind, param: Any = None
     ) -> "Assembly":
         ...
 
@@ -307,19 +311,19 @@ class Assembly(object):
 
     @overload
     def constrain(
-        self,
-        id1: str,
-        s1: Shape,
-        id2: str,
-        s2: Shape,
-        kind: ConstraintKind,
-        param: Any = None,
+            self,
+            id1: str,
+            s1: Shape,
+            id2: str,
+            s2: Shape,
+            kind: ConstraintKind,
+            param: Any = None,
     ) -> "Assembly":
         ...
 
     @overload
     def constrain(
-        self, id1: str, s1: Shape, kind: ConstraintKind, param: Any = None,
+            self, id1: str, s1: Shape, kind: ConstraintKind, param: Any = None,
     ) -> "Assembly":
         ...
 
@@ -508,62 +512,6 @@ class Assembly(object):
 
         return self
 
-    def export(
-        self,
-        path: str,
-        exportType: Optional[ExportLiterals] = None,
-        mode: STEPExportModeLiterals = "default",
-        tolerance: float = 0.1,
-        angularTolerance: float = 0.1,
-        **kwargs,
-    ) -> "Assembly":
-        """
-        Save assembly to a file.
-
-        :param path: Path and filename for writing.
-        :param exportType: export format (default: None, results in format being inferred form the path)
-        :param mode: STEP only - See :meth:`~cadquery.occ_impl.exporters.assembly.exportAssembly`.
-        :param tolerance: the deflection tolerance, in model units. Only used for glTF, VRML. Default 0.1.
-        :param angularTolerance: the angular tolerance, in radians. Only used for glTF, VRML. Default 0.1.
-        :param \\**kwargs: Additional keyword arguments.  Only used for STEP, glTF and STL.
-            See :meth:`~cadquery.occ_impl.exporters.assembly.exportAssembly`.
-        :param ascii: STL only - Sets whether or not STL export should be text or binary
-        :type ascii: bool
-        """
-
-        # Make sure the export mode setting is correct
-        if mode not in get_args(STEPExportModeLiterals):
-            raise ValueError(f"Unknown assembly export mode {mode} for STEP")
-
-        if exportType is None:
-            t = path.split(".")[-1].upper()
-            if t in ("STEP", "XML", "VRML", "VTKJS", "GLTF", "GLB", "STL"):
-                exportType = cast(ExportLiterals, t)
-            else:
-                raise ValueError("Unknown extension, specify export type explicitly")
-
-        if exportType == "STEP":
-            exportAssembly(self, path, mode, **kwargs)
-        elif exportType == "XML":
-            exportCAF(self, path)
-        elif exportType == "VRML":
-            exportVRML(self, path, tolerance, angularTolerance)
-        elif exportType == "GLTF" or exportType == "GLB":
-            exportGLTF(self, path, None, tolerance, angularTolerance)
-        elif exportType == "VTKJS":
-            exportVTKJS(self, path)
-        elif exportType == "STL":
-            # Handle the ascii setting for STL export
-            export_ascii = False
-            if "ascii" in kwargs:
-                export_ascii = bool(kwargs.get("ascii"))
-
-            self.toCompound().exportStl(path, tolerance, angularTolerance, export_ascii)
-        else:
-            raise ValueError(f"Unknown format: {exportType}")
-
-        return self
-
     @classmethod
     def load(cls, path: str) -> "Assembly":
 
@@ -610,11 +558,12 @@ class Assembly(object):
         return rv
 
     def __iter__(
-        self,
-        loc: Optional[Location] = None,
-        name: Optional[str] = None,
-        color: Optional[Color] = None,
-    ) -> Iterator[Tuple[Shape, str, Location, Optional[Color]]]:
+            self,
+            loc: Optional[Location] = None,
+            name: Optional[str] = None,
+            color: Optional[Color] = None,
+            material: Optional[Material] = None,
+    ) -> Iterator[Tuple[Shape, str, Location, Optional[Color], Optional[Material]]]:
         """
         Assembly iterator yielding shapes, names, locations and colors.
         """
@@ -622,14 +571,15 @@ class Assembly(object):
         name = f"{name}/{self.name}" if name else self.name
         loc = loc * self.loc if loc else self.loc
         color = self.color if self.color else color
+        material = self.material if self.material else None
 
         if self.obj:
             yield self.obj if isinstance(self.obj, Shape) else Compound.makeCompound(
                 s for s in self.obj.vals() if isinstance(s, Shape)
-            ), name, loc, color
+            ), name, loc, color, material
 
         for ch in self.children:
-            yield from ch.__iter__(loc, name, color)
+            yield from ch.__iter__(loc, name, color, material)
 
     def toCompound(self) -> Compound:
         """

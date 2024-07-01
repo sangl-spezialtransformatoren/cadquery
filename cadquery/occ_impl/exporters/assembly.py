@@ -1,32 +1,32 @@
 import os.path
 import uuid
-
-from tempfile import TemporaryDirectory
 from shutil import make_archive
-from itertools import chain
+from tempfile import TemporaryDirectory
 from typing import Optional
-from typing_extensions import Literal
 
-from vtkmodules.vtkIOExport import vtkJSONSceneExporter, vtkVRMLExporter
-from vtkmodules.vtkRenderingCore import vtkRenderer, vtkRenderWindow
-
-from OCP.XSControl import XSControl_WorkSession
-from OCP.STEPCAFControl import STEPCAFControl_Writer
-from OCP.STEPControl import STEPControl_StepModelType
 from OCP.IFSelect import IFSelect_ReturnStatus
-from OCP.XCAFApp import XCAFApp_Application
-from OCP.XmlDrivers import (
-    XmlDrivers_DocumentStorageDriver,
-    XmlDrivers_DocumentRetrievalDriver,
-)
-from OCP.TCollection import TCollection_ExtendedString, TCollection_AsciiString
+from OCP.Interface import Interface_Static
+from OCP.Message import Message_ProgressRange
 from OCP.PCDM import PCDM_StoreStatus
 from OCP.RWGltf import RWGltf_CafWriter
+from OCP.STEPCAFControl import STEPCAFControl_Writer
+from OCP.STEPControl import STEPControl_StepModelType
 from OCP.TColStd import TColStd_IndexedDataMapOfStringString
-from OCP.Message import Message_ProgressRange
-from OCP.Interface import Interface_Static
+from OCP.TCollection import TCollection_AsciiString
+from OCP.TCollection import TCollection_ExtendedString
+from OCP.XCAFApp import XCAFApp_Application
+from OCP.XSControl import XSControl_WorkSession
+from OCP.XmlDrivers import XmlDrivers_DocumentRetrievalDriver
+from OCP.XmlDrivers import XmlDrivers_DocumentStorageDriver
+from typing_extensions import Literal
+from vtkmodules.vtkIOExport import vtkJSONSceneExporter
+from vtkmodules.vtkIOExport import vtkVRMLExporter
+from vtkmodules.vtkRenderingCore import vtkRenderWindow
 
-from ..assembly import AssemblyProtocol, toCAF, toVTK, toFusedCAF
+from ..assembly import AssemblyProtocol
+from ..assembly import toCAF
+from ..assembly import toFusedCAF
+from ..assembly import toVTK
 from ..geom import Location
 
 
@@ -39,10 +39,10 @@ STEPExportModeLiterals = Literal["default", "fused"]
 
 
 def exportAssembly(
-    assy: AssemblyProtocol,
-    path: str,
-    mode: STEPExportModeLiterals = "default",
-    **kwargs
+        assy: AssemblyProtocol,
+        path: str,
+        mode: STEPExportModeLiterals = "default",
+        **kwargs
 ) -> bool:
     """
     Export an assembly to a STEP file.
@@ -135,7 +135,7 @@ def exportCAF(assy: AssemblyProtocol, path: str) -> bool:
 
 
 def _vtkRenderWindow(
-    assy: AssemblyProtocol, tolerance: float = 1e-3, angularTolerance: float = 0.1
+        assy: AssemblyProtocol, tolerance: float = 1e-3, angularTolerance: float = 0.1
 ) -> vtkRenderWindow:
     """
     Convert an assembly to a vtkRenderWindow. Used by vtk based exporters.
@@ -159,7 +159,6 @@ def exportVTKJS(assy: AssemblyProtocol, path: str):
     renderWindow = _vtkRenderWindow(assy)
 
     with TemporaryDirectory() as tmpdir:
-
         exporter = vtkJSONSceneExporter()
         exporter.SetFileName(tmpdir)
         exporter.SetRenderWindow(renderWindow)
@@ -168,10 +167,10 @@ def exportVTKJS(assy: AssemblyProtocol, path: str):
 
 
 def exportVRML(
-    assy: AssemblyProtocol,
-    path: str,
-    tolerance: float = 1e-3,
-    angularTolerance: float = 0.1,
+        assy: AssemblyProtocol,
+        path: str,
+        tolerance: float = 1e-3,
+        angularTolerance: float = 0.1,
 ):
     """
     Export an assembly to a vrml file using vtk.
@@ -184,11 +183,11 @@ def exportVRML(
 
 
 def exportGLTF(
-    assy: AssemblyProtocol,
-    path: str,
-    binary: Optional[bool] = None,
-    tolerance: float = 1e-3,
-    angularTolerance: float = 0.1,
+        assy: AssemblyProtocol,
+        path: str,
+        binary: Optional[bool] = None,
+        tolerance: float = 1e-3,
+        angularTolerance: float = 0.1,
 ):
     """
     Export an assembly to a gltf file.
