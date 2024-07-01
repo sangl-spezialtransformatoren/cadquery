@@ -67,6 +67,7 @@ nlopt = [
     { markers = 'python_version == "3.10" and platform_system == "Linux" and platform_machine == "x86_64"', url = "https://files.pythonhosted.org/packages/ac/7a/78301ab01e31e08bc850bf800f34133c823579ace029d7898afe94745571/nlopt-2.7.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl" },
 ]
 
+numpy = "<2.0.0"
 docutils = { version = "*", optional = true }
 ipython = { version = "*", optional = true }
 pytest = { version = "*", optional = true }
