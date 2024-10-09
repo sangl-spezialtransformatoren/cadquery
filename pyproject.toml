@@ -44,7 +44,7 @@ ezdxf = "*"
 multimethod = "==1.9.1"
 nptyping = "==2.0.1"
 typish = "*"
-casadi = "*"
+casadi = ">=3,<4,!=3.6.6"
 path = "*"
 nlopt = [
     # Provide direct links to wheels, as nlopt does not comply with PEP517 and has no wheels for Apple Silicon.
