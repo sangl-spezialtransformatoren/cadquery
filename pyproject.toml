@@ -32,7 +32,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.10, <4"
-cadquery-ocp # = [
+cadquery-ocp = "*" # [
     # Provide wheels for Apple Silicon
     # https://github.com/jdegenstein/ocp-build-system
     # { markers = 'platform_system != "Darwin" or platform_machine != "arm64"', version = ">=7.7.0a0,<7.8" },
