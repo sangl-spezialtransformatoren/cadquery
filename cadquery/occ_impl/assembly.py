@@ -224,7 +224,9 @@ def toCAF(
     vmtool = XCAFDoc_DocumentTool.VisMaterialTool_s(doc.Main())
 
     # used to store labels with unique part-color-material combinations
-    unique_objs: Dict[Tuple[Color, Material, AssemblyObjects], TDF_Label] = {}
+    unique_objs: Dict[
+        Tuple[Optional[Color], Optional[Material], AssemblyObjects], TDF_Label
+    ] = {}
     # used to cache unique, possibly meshed, compounds; allows to avoid redundant meshing operations if same object is referenced multiple times in an assy
     compounds: Dict[AssemblyObjects, Compound] = {}
 
@@ -474,9 +476,7 @@ def toVTK(
             if element.material.pbr:
                 actor.GetProperty().SetMetallic(element.material.pbr.metallic)
                 actor.GetProperty().SetRoughness(element.material.pbr.roughness)
-                actor.GetProperty().SetRefractionIndex(
-                    element.material.pbr.refraction_index
-                )
+                actor.GetProperty().SetBaseIOR(element.material.pbr.refraction_index)
                 if element.material.pbr.emissive_factor:
                     actor.GetProperty().SetEmissiveFactor(
                         *element.material.pbr.emissive_factor.rgb()
