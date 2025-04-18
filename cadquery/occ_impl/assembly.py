@@ -398,10 +398,9 @@ def toVTKAssy(
                 actor.GetProperty().SetMetallic(element.material.pbr.metallic)
                 actor.GetProperty().SetRoughness(element.material.pbr.roughness)
                 actor.GetProperty().SetBaseIOR(element.material.pbr.refraction_index)
-                if element.material.pbr.emissive_factor:
-                    actor.GetProperty().SetEmissiveFactor(
-                        *element.material.pbr.emissive_factor.rgb()
-                    )
+                actor.GetProperty().SetEmissiveFactor(
+                    *element.material.pbr.emissive_factor.rgb()
+                )
 
         rv.AddPart(actor)
 
@@ -475,10 +474,9 @@ def toVTK(
                 actor.GetProperty().SetMetallic(element.material.pbr.metallic)
                 actor.GetProperty().SetRoughness(element.material.pbr.roughness)
                 actor.GetProperty().SetBaseIOR(element.material.pbr.refraction_index)
-                if element.material.pbr.emissive_factor:
-                    actor.GetProperty().SetEmissiveFactor(
-                        *element.material.pbr.emissive_factor.rgb()
-                    )
+                actor.GetProperty().SetEmissiveFactor(
+                    *element.material.pbr.emissive_factor.rgb()
+                )
 
         renderer.AddActor(actor)
 
@@ -531,10 +529,9 @@ def toJSON(
                     "roughness": element.material.pbr.roughness,
                     "refraction_index": element.material.pbr.refraction_index,
                 }
-                if element.material.pbr.emissive_factor:
-                    val["material"]["pbr"][
-                        "emissive_factor"
-                    ] = element.material.pbr.emissive_factor.rgba()
+                val["material"]["pbr"][
+                    "emissive_factor"
+                ] = element.material.pbr.emissive_factor.rgba()
 
         rv.append(val)
 

@@ -40,7 +40,6 @@ from ..assembly import (
 )
 from ..geom import Location
 from ..shapes import Shape, Compound
-from ..assembly import Color
 
 
 class ExportModes:
